@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block navbar %}
+    {% include '_navbar.html' %}
+{% endblock %}
+
+{% block title %}Financial Dashboard{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    :root {
+        --primary-color: #082E38;
+        --secondary-color: #3FA7C3;
+        --accent-color: #3FA7C3;
+        --dark-color: #2b2d42;
+        --light-color: #f8f9fa;
+        --success-color: #4cc9f0;
+        --border-radius: 12px;
+        --box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+        --transition: all 0.3s ease;
+    }
+    
+    .dashboard-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        padding: 2.5rem 0;
+        margin-bottom: 2rem;
+        border-radius: 0 0 var(--border-radius) var(--border-radius);
+        box-shadow: var(--box-shadow);
+    }
+    
+    .dashboard-header h2 {
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .dashboard-header p {
+        opacity: 0.9;
+        font-weight: 300;
+        font-size: 1.1rem;
+    }
+    
+    .chart-container {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        height: 100%;
+        transition: var(--transition);
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .chart-container:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 35px rgba(0,0,0,0.12);
+    }
+    
+    .chart-title {
+        color: var(--dark-color);
+        margin-bottom: 1.5rem;
+        font-weight: 600;
+        font-size: 1.25rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .chart-title:before {
+        content: "";
+        display: inline-block;
+        width: 8px;
+        height: 20px;
+        background: var(--accent-color);
+        margin-right: 12px;
+        border-radius: 4px;
+    }
+    
+    .row-equal {
+        display: flex;
+        flex-wrap: wrap;
+    }
+    
+    .row-equal > [class*='col-'] {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .container {
+        max-width: 1400px;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .dashboard-header {
+            padding: 1.5rem 0;
+            text-align: center;
+        }
+        
+        .chart-container {
+            padding: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <div class="container">
+        <h2>Financial Dashboard</h2>
+        <p>Visualizing your spending patterns and financial health</p>
+    </div>
+</div>
+
+<div class="container">
+    <!-- First Row - Main Summary Cards, hard-coded to show MVP of functionality -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between"> 
+                <div class="summary-card">
+                    <span class="summary-label">Total Spending</span>
+                    <span class="summary-value">$4,287</span>
+                    <span class="summary-change positive">+2.4%</span>
+                </div>
+                <div class="summary-card">
+                    <span class="summary-label">Top Category</span>
+                    <span class="summary-value">Dining</span>
+                    <span class="summary-change negative">+12.1%</span>
+                </div>
+                <div class="summary-card">
+                    <span class="summary-label">Savings Rate</span>
+                    <span class="summary-value">18%</span>
+                    <span class="summary-change positive">+3.2%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Second Row - Pie Chart -->
+    <div class="row row-equal mb-4">
+        <div class="col-md-12">
+            <div class="chart-container">
+                <h3 class="chart-title">Spending by Category</h3>
+                {{ charts['pie']|safe }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Third Row - Timeline Charts -->
+    <div class="row row-equal mb-4">
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h3 class="chart-title">Daily Spending</h3>
+                {{ charts['timeline']|safe }}
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h3 class="chart-title">Accumulated Spending</h3>
+                {{ charts['timeline_accumulated']|safe }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Fourth Row - Combined Chart -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="chart-container">
+                <h3 class="chart-title">Daily vs. Accumulated Spending</h3>
+                {{ charts['timeline_combined']|safe }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

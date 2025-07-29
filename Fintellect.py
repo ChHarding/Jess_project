@@ -101,35 +101,37 @@ def process_statement(file_stream):
 def upload_file():
     if request.method == 'POST':
         if 'file' not in request.files:
-            flash('No file selected', 'error')
+            flash('No files selected', 'error')
             return redirect(request.url)
             
-        file = request.files['file']
-        
-        if file.filename == '':
-            flash('No file selected', 'error')
+        files = request.files.getlist('file')
+        if not files or all(f.filename == '' for f in files):
+            flash('No files selected', 'error')
             return redirect(request.url)
             
-        if file and allowed_file(file.filename):
-            try:
-                filename = secure_filename(file.filename)
-                temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(temp_path)
-                
-                df = process_statement(temp_path)
+        try:
+            all_dfs = []
+            for file in files:
+                if file and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(temp_path)
+                    df = process_statement(temp_path)
+                    all_dfs.append(df)
+            
+            if all_dfs:
+                combined_df = pd.concat(all_dfs)
                 processed_path = os.path.join(app.config['UPLOAD_FOLDER'], 'processed.csv')
-                hdr = False  if os.path.isfile(processed_path) else True
-                df.to_csv(processed_path, index=False, mode="a", header=hdr)
-                
-                flash('File processed successfully!', 'success')
+                combined_df.to_csv(processed_path, index=False)
+                flash(f'{len(all_dfs)} files processed successfully!', 'success')
                 return redirect(url_for('dashboard'))
+            else:
+                flash('No valid CSV files were uploaded', 'error')
                 
-            except Exception as e:
-                flash(f'Error processing file: {str(e)}', 'error')
-        else:
-            flash('Only CSV files allowed', 'error')
+        except Exception as e:
+            flash(f'Error processing files: {str(e)}', 'error')
     
-    return render_template('upload_CH.html')
+    return render_template('upload.html')
 
 @app.route('/dashboard')
 def dashboard():
@@ -146,8 +148,20 @@ def dashboard():
         missing = [col for col in required_cols if col not in df.columns]
         if missing:
             raise ValueError(f"Missing columns: {', '.join(missing)}")
-        else:
-            print("All required columns are present.")
+        
+        # Define color scheme
+        category_colors = {
+            'Eating Out': '#8a3ffc',
+            'Groceries': '#007d79',
+            'Shopping': '#33b1ff',
+            'Entertainment': '#d4bbff',
+            'Travel': '#6fdc8c',
+            'Utilities': '#08bdba',
+            'Health': '#ff7eb6',
+            'Cat': '#4589ff',
+            'Dance': '#bae6ff',
+            'Uncategorized': '#FF9800'
+        }
         
         # Fill missing categories
         df['auto_category'] = df['auto_category'].fillna('Uncategorized')
@@ -155,7 +169,7 @@ def dashboard():
         # Create visualizations
         charts = {}
         
-        # 1. Overall Pie Chart
+        # 1. Pie Chart with custom colors
         df_pie = df.copy()
         df_pie['amount'] = df_pie['amount'].abs()
         pie_data = df_pie.groupby('auto_category', as_index=False)['amount'].sum()
@@ -164,35 +178,21 @@ def dashboard():
             pie_data,
             values='amount',
             names='auto_category',
-            title='Spending by Category (Percentage of Total)'
-        ).update_traces(textinfo='percent+label').to_html(full_html=False)
+            title='Spending by Category',
+            color='auto_category',
+            color_discrete_map=category_colors
+        ).update_traces(
+            textinfo='percent+label',
+            textposition='inside',
+            marker=dict(line=dict(color='#ffffff', width=1))
+        ).update_layout(
+            showlegend=True,
+            uniformtext_minsize=12,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
+        ).to_html(full_html=False)
         
-        # 2. Expense Pie Chart
-        # if 'transaction_type' in df.columns:
-            # df_expense = df[df['transaction_type'] == 'Expense'].copy()
-            # df_expense['amount'] = df_expense['amount'].abs()
-            # pie_data_expense = df_expense.groupby('auto_category', as_index=False)['amount'].sum()
-            
-            # charts['pie_exp'] = px.pie(
-               # pie_data_expense,
-               # values='amount',
-               # names='auto_category',
-               # title='Expenses by Category (Percentage of Total)'
-            # ).update_traces(textinfo='percent+label').to_html(full_html=False)
-            
-            # 3. Income Pie Chart - TBD
-            # df_income = df[df['transaction_type'] == 'Income'].copy()
-            # df_income['amount'] = df_income['amount'].abs()
-            # pie_data_income = df_income.groupby('auto_category', as_index=False)['amount'].sum()
-            
-            #charts['pie_inc'] = px.pie(
-               # pie_data_income,
-               # values='amount',
-               # names='auto_category',
-               # title='Income by Category (Percentage of Total)'
-            # ).update_traces(textinfo='percent+label').to_html(full_html=False)
-        
-        # 4. Time Series Charts
+        # 2. Time Series Charts
         if 'date' in df.columns:
             df['date'] = pd.to_datetime(df['date'])
             
@@ -205,7 +205,11 @@ def dashboard():
                 df_daily, 
                 x='date', 
                 y='amount',
-                title='Daily Spending'
+                title='Daily Spending',
+                color_discrete_sequence=['#007d79']
+            ).update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)'
             ).to_html(full_html=False)
             
             # Cumulative Expenses
@@ -214,11 +218,14 @@ def dashboard():
                 df_daily, 
                 x='date', 
                 y='cumulative',
-                color_discrete_sequence=['red'],
-                title='Daily Spending (Accumulated)'
+                title='Daily Spending (Accumulated)',
+                color_discrete_sequence=['#007d79']
+            ).update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)'
             ).to_html(full_html=False)
             
-            # Combined Daily and Cumulative
+            # Combined Chart
             df_long = df_daily.melt(
                 id_vars='date',
                 value_vars=['amount', 'cumulative'],
@@ -231,10 +238,14 @@ def dashboard():
                 x='date',
                 y='Value',
                 color='Type',
-                title='Daily and Cumulative Spending'
+                title='Daily and Cumulative Spending',
+                color_discrete_sequence=['#007d79', '#d12771']
+            ).update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)'
             ).to_html(full_html=False)
         
-        return render_template('dashboard_CH.html', charts=charts)
+        return render_template('dashboard.html', charts=charts)
         
     except Exception as e:
         flash(f'Dashboard error: {str(e)}', 'error')
@@ -245,7 +256,7 @@ def show_results():
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'processed.csv')
     if os.path.exists(filepath):
         df = pd.read_csv(filepath)
-        return render_template('results_CH.html', tables=[df.to_html(classes='data')])
+        return render_template('results.html', tables=[df.to_html(classes='data')])
     else:
         flash('No processed data found', 'error')
         return redirect(url_for('upload_file'))
@@ -258,11 +269,12 @@ def edit_transactions():
             flash('No transactions found. Please upload a file first.', 'error')
             return redirect(url_for('upload_file'))
         
-        # Define standard categories (you can expand this)
+        # Define standard categories
         categories = [
-            'Eating Out', 'Groceries', 'Amazon', 
-            'Entertainment', 'Transportation', 
-            'Utilities', 'Uncategorized'
+            'Eating Out', 'Groceries', 'Shopping', 
+            'Entertainment', 'Travel', 
+            'Utilities', 'Health',
+            'Cat', 'Dance'
         ]
         
         if request.method == 'POST':
@@ -299,5 +311,5 @@ def edit_transactions():
         return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
-    app.run(debug=True,port=5000
+    app.run(debug=True,port=8000
 )
